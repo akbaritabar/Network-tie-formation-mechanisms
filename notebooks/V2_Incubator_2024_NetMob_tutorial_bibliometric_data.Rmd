@@ -1,0 +1,305 @@
+---
+title: "Tie formation mechanisms in social networks"
+subtitle: "Network analysis; an introduction (with igraph in R)"
+author: |
+  | Ali (Aliakbar Akbaritabar)
+  |
+  | Email: Akbaritabar@demogr.mpg.de
+  | 2019-11-21 - Humboldt-Universität zu Berlin
+  | Updated on: 2024-06-17 - MPIDR Summer Incubator Program
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction to iGraph in R
+
+The iGraph interface is very consistent between R, Python and I suppose in Mathematica and C.
+
+## Outline of brief introduction to Network Analysis
+
+> 1.  What is relational view and network analysis?
+> 2.  Ethnography of network ties! Context of interactions
+> 3.  How to gather and use network data?
+> 4.  Possible questions to ask!
+> 5.  A real life example from science studies!
+> 6.  Where to next?!
+
+## Read Edge List as CSV (to construct a network)
+
+```{r}
+library(tidyverse)
+edge_list2_use <- read_csv("../data/humans_ties.csv")
+# take a look
+edge_list2_use
+```
+
+## Convert it to a (network) graph object[^1]
+
+[^1]: Python users, check scripts "09_example_network_igraph_python.py" and "10_igraph_from_pandas.py" in notebooks directory under "for_python_users"
+
+```{r}
+library(igraph)
+gg = graph_from_data_frame(d = edge_list2_use, directed = TRUE)
+
+print(gg)
+```
+
+## Plot the graph with a layout (directed)
+
+```{r}
+set.seed(2225235)
+gg_layout = layout.fruchterman.reingold(graph = gg)
+plot(gg, layout = gg_layout, edge.label = NA, vertex.size=8)
+```
+
+## Plot the graph with a layout (un-directed)
+
+```{r}
+gg_undirected = graph_from_data_frame(d = edge_list2_use, directed = F)
+gg_undirected = simplify(graph = gg_undirected, remove.multiple = T)
+plot(gg_undirected, layout = gg_layout, edge.label = NA, vertex.size=8)
+```
+
+## Add a new attribute to nodes?
+
+```{r}
+print(V(gg))
+V(gg)$gender <- c('male', 'female', 'male', 'female')
+V(gg)$shape <- c('circle', 'square', 'circle', 'square')
+print(gg)
+```
+
+## Color and shape of nodes based on gender
+
+```{r}
+plot(gg, edge.label = NA, vertex.color = factor(V(gg)$gender), 
+     vertex.shape = V(gg)$shape, layout = gg_layout, vertex.size=8)
+```
+
+## Name ties based on types
+
+```{r}
+plot(gg, edge.label = E(gg)$label, layout = gg_layout, vertex.size=8)
+```
+
+## Weight ties based on importance
+
+```{r}
+plot(gg, edge.width = E(gg)$weight*5, edge.label = E(gg)$weight, layout = gg_layout, vertex.size=8)
+```
+
+## Mixture of weight/label
+
+```{r}
+plot(gg, edge.label = E(gg)$label, edge.width = E(gg)$weight*5, layout = gg_layout, vertex.size=8)
+```
+
+## A glimpse to more serious analysis
+
+-   After simple visualization (if possible), a five number summary!
+    1.  **Size**: *V*, *E* (N of vertices/nodes and ties/edges, respectively)
+    2.  **Density** (ratio of ties to possible ties, 1 = fully connected)
+    3.  **Components** & (dis)connectivity (more connection inside groups, less among them)
+    4.  **Diameter** (how compact the network is?)
+    5.  **Clustering Coefficient** (transitivity and triangles)
+-   **Centrality** in network (different measures of importance in structure)
+    -   Degree, Closeness, Betweenness, Eigenvector, ...
+
+## In-degree of a node (incoming ties)
+
+```{r}
+plot(gg, edge.label = NA, edge.width = E(gg)$weight*5, 
+     vertex.label = degree(gg, mode = 'in'), layout = gg_layout, vertex.size=8)
+```
+
+## Out-degree of a node (outgoing ties)
+
+```{r}
+plot(gg, edge.label = NA, edge.width = E(gg)$weight*5, 
+     vertex.label = degree(gg, mode = 'out'), layout = gg_layout, vertex.size=8)
+```
+
+## Degree of a node (both incoming/outgoing ties)
+
+```{r}
+plot(gg, edge.label = NA, edge.width = E(gg)$weight*5, 
+     vertex.label = degree(gg, mode = 'all'), layout = gg_layout, vertex.size=8)
+```
+
+# Conditional Uniform Graph Tests (CUG)
+
+The idea is straightforward, we take the network statistic that we have observed in our empirical network and compare it with randomly generated network which is conditioned based on density, count of edges and nodes to be as similar as possible to our empirical network.
+
+The goal is to answer, does the empirical network have properties that we would expect to see randomly i.e., in a random network or not.
+
+SNA package provides methods todo such test and plot the results.
+
+Please note that if we do not set a random seed, we will get different random networks and the test results will be stochastically changing.
+
+```{r}
+# from SNA R library documentation and methods
+library(sna)
+# set a seed to obtain the same results
+set.seed(124)
+
+# Draw a highly reciprocal network
+g<-rguman(1,15,mut=0.25,asym=0.05,null=0.7)
+
+# a look
+sna::gplot(g)
+
+#Test transitivity against size, density, and the dyad census
+cug.test(g,gtrans,cmode="size")
+
+cug.test(g,gtrans,cmode="edges")
+
+cug.test(g,gtrans,cmode="dyad.census")
+
+# plot them
+par(mfrow=c(1,3))
+plot(cug.test(g,gtrans,cmode="size"), main='Size')
+
+plot(cug.test(g,gtrans,cmode="edges"), main='Edge count')
+
+plot(cug.test(g,gtrans,cmode="dyad.census"), main='Dyad census')
+
+
+```
+
+See here for more elaborate examples or check the books and papers I introduced on slides: <https://rpubs.com/pjmurphy/536741>
+
+# Example of a bibliometric network
+
+## Bipartite network with paper and author nodes, and visualization
+
+Here is the bible of iGraph visualization: <https://kateto.net/network-visualization>
+
+My method in getting a replicable visualization with fixed layout: <https://akbaritabar.github.io/CV_MD/replicable_network_vis.html>
+
+```{r}
+# read edges
+edges_table <- read_csv('../data/bipartite_author_paper_edges.csv')
+
+# a look
+head(edges_table)
+
+# read vertices
+vertices_table <- read_csv('../data/bipartite_author_paper_vertices.csv')
+
+# a look
+head(vertices_table)
+
+# create a network
+bip_author_paper <- graph_from_data_frame(d = edges_table, vertices = vertices_table, directed = FALSE)
+
+# this writes a summary of graph object, attributes, etc.
+print(bip_author_paper)
+
+bip_author_paper_layout = layout.kamada.kawai(graph = bip_author_paper)
+
+# add shape/color based on type of bipartite nodes
+V(bip_author_paper)$shape <- c("square", "circle")[V(bip_author_paper)$type+1]
+
+# visualize it (see Kateo's bible for elements to modify)
+plot(bip_author_paper, layout = bip_author_paper_layout, edge.label = NA, vertex.size=6, vertex.label.cex=0.8, vertex.color = factor(V(bip_author_paper)$gender))
+
+
+
+```
+
+## Projection to one mode
+
+```{r}
+
+both_graphs <- bipartite_projection(bip_author_paper)
+
+print(both_graphs)
+
+papers_g <- both_graphs$proj1
+
+authors_g <- both_graphs$proj2
+
+```
+
+```{r}
+# visualize it (see Kateo's bible for elements to modify)
+plot(papers_g, layout = layout.kamada.kawai, edge.label = NA, vertex.size=4, vertex.label.cex=0.4)
+
+plot(authors_g, layout = layout.kamada.kawai, edge.label = NA, vertex.size=4, vertex.label.cex=0.4, vertex.color = factor(V(bip_author_paper)$gender))
+```
+
+# Exponential Random Graph Models (ERGMs) using Statnet and Ergm
+
+Please check also the official ERGM tutorial on statnet page: <https://statnet.org/workshop-ergm/ergm_tutorial.html>
+
+Here we will continue using our toy example.
+
+First, we need to either read the graph from edgelist with statnet, or use "intergraph" to convert igraph object to network object (see here: https://cran.r-project.org/web/packages/intergraph/vignettes/howto.html).
+
+```{r}
+library(intergraph)
+
+authors_g_n <- asNetwork(authors_g)
+
+print(authors_g)
+
+print(authors_g_n)
+
+# check class
+class(authors_g_n)
+
+# similar to igraph, you can plot and do all sorts of things using this network object
+plot(authors_g_n, vertex.cex = 1)
+```
+
+
+
+```{r}
+library(statnet)
+# or library(ergm) if you only use ergm function
+
+# simplest model
+m_only_edges <- ergm(authors_g_n ~ edges) 
+
+summary(m_only_edges)
+
+```
+
+```{r}
+library(texreg)
+
+screenreg(m_only_edges)
+
+```
+
+## A comprehenstive list of ERGM terms and cross-referencing them
+
+See here for the list of available ERGM terms and for which networks (directed, undirected, bipartite, etc) you can use them.
+
+https://cran.r-project.org/web/packages/ergm/vignettes/ergm-term-crossRef.html
+
+
+```{r}
+# a bit more complicated model with homophily based on gender
+m_gender <- ergm(authors_g_n ~ edges + nodematch("gender", diff=T)) 
+
+summary(m_gender)
+
+screenreg(list(m_only_edges, m_gender))
+
+```
+
+
+Good luck from here and best wishes for analyzing networks!
+
+
+
+
+```{r}
+# just to remember the version of packages used here
+sessionInfo()
+
+```
